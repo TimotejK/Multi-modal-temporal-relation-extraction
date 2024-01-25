@@ -25,8 +25,8 @@ def test_maccrobat(realistic=True, remove_wrong=False):
                 "optimizer": "adam",
             },
             "graph": {
-                "learning_rate": 0.0001,
-                "weight_decay": 0.1,
+                "learning_rate": 0.00001,
+                "weight_decay": 0.0001,
                 "optimizer": "adamw",
             },
             "bimodal": {
@@ -40,6 +40,30 @@ def test_maccrobat(realistic=True, remove_wrong=False):
                 "optimizer": "sgd",
             }
         }
+    
+    # Nastavitve prej:
+    # maccrobat_training_settings = {
+    #         "text": {
+    #             "learning_rate": 0.01,
+    #             "weight_decay": 0.001,
+    #             "optimizer": "adam",
+    #         },
+    #         "graph": {
+    #             "learning_rate": 0.0001,
+    #             "weight_decay": 0.1,
+    #             "optimizer": "adamw",
+    #         },
+    #         "bimodal": {
+    #             "learning_rate": 0.01,
+    #             "weight_decay": 0.05,
+    #             "optimizer": "sgd",
+    #         },
+    #         "bimodal2": {
+    #             "learning_rate": 0.01,
+    #             "weight_decay": 0.01,
+    #             "optimizer": "sgd",
+    #         }
+    #     }
 
     configuration.training = maccrobat_training_settings
 
@@ -48,8 +72,8 @@ def test_maccrobat(realistic=True, remove_wrong=False):
             "text_model_pretraining": True,
             "oversample_dataset": False,
             "train_text_model": False,
-            "train_graph_model": False,
-            "use_cached_datasets": False,
+            "train_graph_model": True,
+            "use_cached_datasets": True,
             "use_learned_text_model_for_transitive": False
         }
 
@@ -177,7 +201,7 @@ if __name__ == '__main__':
 
     if "i2b2" in sys.argv:
         test_i2b2(True, remove_wrong=remove_wrong)
-    if "maccrobat" in sys.argv:
+    if True or "maccrobat" in sys.argv:
         test_maccrobat(True, remove_wrong=remove_wrong)
     if "maccrobat_unrealistic" in sys.argv:
         test_maccrobat(False, remove_wrong=remove_wrong)

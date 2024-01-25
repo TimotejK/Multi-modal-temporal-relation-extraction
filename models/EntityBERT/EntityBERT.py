@@ -807,6 +807,7 @@ def statistical_significance(use_thyme=False):
         # file1.close()
 
 def full_test_battery_for_new_dataset(configuration, df, df_test=None, settings=None):
+    print(configuration)
     if settings is None:
         settings = {
             "dataset_name": 'THYME',
@@ -826,7 +827,7 @@ def full_test_battery_for_new_dataset(configuration, df, df_test=None, settings=
         df_test_windowed = combining_data.window_for_entity_bert(df_test)
         if settings['use_cached_datasets']:
             save_path = 'checkpoints/battery_' + settings['dataset_name']
-            dataLoader_test = torch.load(save_path + '/dataset_cache' + 'test.pt')
+            dataLoader_test = torch.load(save_path + '/dataset_cache' + '_test.pt')
         else:
             dataset_test = KnowledgeGraphDataset([], df_test_windowed)
             dataLoader_test = torch_geometric.loader.DataLoader(dataset_test, batch_size=64)
@@ -848,8 +849,10 @@ def full_test_battery_for_new_dataset(configuration, df, df_test=None, settings=
             dataLoader = torch_geometric.loader.DataLoader(dataset, batch_size=64)
             dataset_val = KnowledgeGraphDataset([], combining_data.window_for_entity_bert(val_df), number_of_classes=number_of_classes)
             dataLoader_val = torch_geometric.loader.DataLoader(dataset_val, batch_size=64)
-            train(model, dataLoader, dataLoader_val, epochs=epochs, learning_rate=0.001, weight_decay=0.0005,
-                  optimizer="adamw",
+            train(model, dataLoader, dataLoader_val, epochs=epochs, 
+                  learning_rate=configuration.training['text']['learning_rate'], 
+                  weight_decay=configuration.training['text']['weight_decay'],
+                  optimizer=configuration.training['text']['optimizer'],
                   batch_size=64, pretraining=False, save_path=save_path + '_text')
             text_model = torch.load(save_path + '_text' + '/model_best.pt')
             accuracy, f1 = run_test(text_model, dataLoader_test, device)
@@ -865,41 +868,46 @@ def full_test_battery_for_new_dataset(configuration, df, df_test=None, settings=
 
     # Prepare realistic graph
     if settings['use_cached_datasets']:
-        dataLoader_train = torch.load(save_path + '/dataset_cache' + 'train.pt')
+        dataLoader_train = torch.load(save_path + '/dataset_cache' + '_train.pt')
     else:
         train_graph = construct_graph_from_text_only(train_df, configuration, dataset_type="train")
         train_dataset = KnowledgeGraphDataset(train_graph, combining_data.window_for_entity_bert(train_df), configuration=configuration)
         dataLoader_train = torch_geometric.loader.DataLoader(train_dataset, batch_size=batch_size)
-        torch.save(dataLoader_train, save_path + '/dataset_cache' + 'train.pt')
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        torch.save(dataLoader_train, save_path + '/dataset_cache' + '_train.pt')
 
     if settings['use_cached_datasets']:
-        dataLoader_val = torch.load(save_path + '/dataset_cache' + 'val.pt')
+        dataLoader_val = torch.load(save_path + '/dataset_cache' + '_val.pt')
     else:
         val_graph = construct_graph_from_text_only(val_df, configuration, dataset_type="validation")
         val_dataset = KnowledgeGraphDataset(val_graph, combining_data.window_for_entity_bert(val_df), configuration=configuration)
         dataLoader_val = torch_geometric.loader.DataLoader(val_dataset, batch_size=batch_size)
-        torch.save(dataLoader_val, save_path + '/dataset_cache' + 'val.pt')
+        torch.save(dataLoader_val, save_path + '/dataset_cache' + '_val.pt')
 
     if settings['use_cached_datasets']:
-        dataLoader_val2 = torch.load(save_path + '/dataset_cache' + 'val2.pt')
+        dataLoader_val2 = torch.load(save_path + '/dataset_cache' + '_val2.pt')
     else:
         val2_graph = construct_graph_from_text_only(test_df, configuration, dataset_type="validation2")
         val2_dataset = KnowledgeGraphDataset(val2_graph, combining_data.window_for_entity_bert(test_df), configuration=configuration)
         dataLoader_val2 = torch_geometric.loader.DataLoader(val2_dataset, batch_size=batch_size)
-        torch.save(dataLoader_val2, save_path + '/dataset_cache' + 'val2.pt')
+        torch.save(dataLoader_val2, save_path + '/dataset_cache' + '_val2.pt')
 
     if settings['use_cached_datasets']:
-        dataLoader_test = torch.load(save_path + '/dataset_cache' + 'test.pt')
+        dataLoader_test = torch.load(save_path + '/dataset_cache' + '_test.pt')
     else:
         test_graph = construct_graph_from_text_only(df_test, configuration, dataset_type="test")
         test_dataset = KnowledgeGraphDataset(test_graph, df_test_windowed, configuration=configuration)
         dataLoader_test = torch_geometric.loader.DataLoader(test_dataset, batch_size=batch_size)
-        torch.save(dataLoader_test, save_path + '/dataset_cache' + 'test.pt')
+        torch.save(dataLoader_test, save_path + '/dataset_cache' + '_test.pt')
 
     if settings['train_graph_model']:
         graph_model = GNNRelationPrediction(use_edge_features=True, dropout=0.1, number_of_relations=number_of_classes)
-        train(graph_model, dataLoader_train, dataLoader_val, epochs=100, learning_rate=0.0001, weight_decay=0.1,
-              optimizer="adamw",
+        # graph_model = torch.load('checkpoints/new_best/maccrobat_graph_starter.pt')
+        train(graph_model, dataLoader_train, dataLoader_val, epochs=100, 
+              learning_rate=configuration.training['graph']['learning_rate'], 
+              weight_decay=configuration.training['graph']['weight_decay'],
+              optimizer=configuration.training['graph']['optimizer'],
               batch_size=64, pretraining=False, save_path=save_path + '_graph')
     graph_model = torch.load(save_path + '_graph' + '/model_best.pt')
     graph_accuracy, graph_f1 = run_test(graph_model, dataLoader_test, device)
@@ -909,13 +917,17 @@ def full_test_battery_for_new_dataset(configuration, df, df_test=None, settings=
     bimodal_model.text_model = text_model
     bimodal_model.graph_model = graph_model
     bimodal_model.combine_embeddings = False
-    train(bimodal_model, dataLoader_train, dataLoader_val, epochs=10, learning_rate=0.01, weight_decay=0.05,
-          optimizer="sgd",
+    train(bimodal_model, dataLoader_train, dataLoader_val, epochs=10,
+          learning_rate=configuration.training['bimodal']['learning_rate'], 
+          weight_decay=configuration.training['bimodal']['weight_decay'],
+          optimizer=configuration.training['bimodal']['optimizer'],
           batch_size=64, pretraining=False,
           save_path=save_path + '_bimodal')
     bimodal_model = torch.load(save_path + '_bimodal' + '/model_best.pt')
-    train(bimodal_model, dataLoader_train, dataLoader_val, epochs=30, learning_rate=0.01, weight_decay=0.01,
-          optimizer="sgd",
+    train(bimodal_model, dataLoader_train, dataLoader_val, epochs=30, 
+          learning_rate=configuration.training['bimodal2']['learning_rate'], 
+          weight_decay=configuration.training['bimodal2']['weight_decay'],
+          optimizer=configuration.training['bimodal2']['optimizer'],
           batch_size=64, pretraining=False,
           save_path=save_path + '_bimodal')
     bimodal_model = torch.load(save_path + '_bimodal' + '/model_best.pt')
